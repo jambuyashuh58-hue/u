@@ -1,0 +1,13 @@
+{
+  "name": "ultramind-companion",
+  "version": "1.0.0",
+  "description": "UltraMind Companion - Brain Health Optimization App",
+  "private": true,
+  "scripts": {
+    "build": "cd api && npm install && npx prisma generate",
+    "vercel-build": "cd api && npm install && npx prisma generate"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

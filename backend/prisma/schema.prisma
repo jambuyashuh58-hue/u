@@ -1,0 +1,368 @@
+// Prisma Schema for UltraMind Companion
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================== USER & AUTH ==================
+
+model User {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  passwordHash        String?
+  name                String?
+  avatarUrl           String?
+  
+  // Subscription
+  subscriptionStatus  SubscriptionStatus @default(FREE)
+  subscriptionPlan    String?
+  subscriptionExpires DateTime?
+  revenueCatId        String?   @unique
+  
+  // Onboarding
+  onboardingCompleted Boolean   @default(false)
+  currentWeek         Int       @default(1)
+  dailyStreak         Int       @default(0)
+  lastActiveAt        DateTime?
+  
+  // Relations
+  goals               UserGoal[]
+  challenges          UserChallenge[]
+  checkIns            DailyCheckIn[]
+  supplementLogs      SupplementLog[]
+  mindSessions        MindSession[]
+  coachMessages       CoachMessage[]
+  journalEntries      JournalEntry[]
+  assessments         Assessment[]
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@map("users")
+}
+
+enum SubscriptionStatus {
+  FREE
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  EXPIRED
+}
+
+model UserGoal {
+  id        String   @id @default(cuid())
+  userId    String
+  goal      Goal
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, goal])
+  @@map("user_goals")
+}
+
+enum Goal {
+  MENTAL_CLARITY
+  EMOTIONAL_RESILIENCE
+  PHYSICAL_ENERGY
+  SYSTEM_RESET
+}
+
+model UserChallenge {
+  id        String    @id @default(cuid())
+  userId    String
+  challenge Challenge
+  severity  Int       @default(5) // 1-10
+  createdAt DateTime  @default(now())
+  
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, challenge])
+  @@map("user_challenges")
+}
+
+enum Challenge {
+  BRAIN_FOG
+  LOW_ENERGY
+  MOOD_SWINGS
+  SLEEP_ISSUES
+  DIGESTIVE_PROBLEMS
+  STRESS
+}
+
+// ================== DAILY CHECK-INS ==================
+
+model DailyCheckIn {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime @db.Date
+  
+  energyLevel   Int      // 1-10
+  mood          Int      // 1-10
+  brainClarity  Int      // 1-10
+  
+  sleepHours    Float?
+  sleepQuality  Int?     // 1-10
+  
+  notes         String?
+  
+  // Actions completed
+  nutritionDone    Boolean @default(false)
+  supplementsDone  Boolean @default(false)
+  movementDone     Boolean @default(false)
+  mindfulnessDone  Boolean @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("daily_check_ins")
+}
+
+// ================== SUPPLEMENTS ==================
+
+model Supplement {
+  id           String   @id @default(cuid())
+  name         String
+  dosage       String
+  instructions String?
+  timeOfDay    TimeOfDay
+  scheduledTime String?  // "08:00"
+  iconType     String?
+  color        String?
+  weekNumber   Int?     // Which week of program
+  
+  logs         SupplementLog[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("supplements")
+}
+
+enum TimeOfDay {
+  MORNING
+  NOON
+  NIGHT
+}
+
+model SupplementLog {
+  id           String     @id @default(cuid())
+  userId       String
+  supplementId String
+  date         DateTime   @db.Date
+  takenAt      DateTime
+  skipped      Boolean    @default(false)
+  
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  supplement   Supplement @relation(fields: [supplementId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime   @default(now())
+
+  @@unique([userId, supplementId, date])
+  @@map("supplement_logs")
+}
+
+// ================== MIND TRAINING ==================
+
+model MindSession {
+  id                   String      @id @default(cuid())
+  userId               String
+  sessionType          SessionType
+  durationMinutes      Int
+  completedMinutes     Int
+  cyclesCompleted      Int         @default(0)
+  binauralBeatsEnabled Boolean     @default(true)
+  
+  startedAt            DateTime    @default(now())
+  completedAt          DateTime?
+  
+  user                 User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("mind_sessions")
+}
+
+enum SessionType {
+  BREATHING
+  MEDITATION
+  VISUALIZATION
+}
+
+// ================== AI COACH ==================
+
+model CoachMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      Role
+  content   String   @db.Text
+  
+  // For AI-generated actions
+  actions   Json?    // Array of CoachAction objects
+  
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("coach_messages")
+}
+
+enum Role {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ================== JOURNAL & ASSESSMENTS ==================
+
+model JournalEntry {
+  id                 String   @id @default(cuid())
+  userId             String
+  entryType          EntryType
+  
+  // Emotional Detox fields
+  trigger            String?  @db.Text
+  emotion            String?
+  intensity          Int?     // 1-10
+  cognitiveDistortion String?
+  reframedThought    String?  @db.Text
+  
+  // General journal
+  content            String?  @db.Text
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("journal_entries")
+}
+
+enum EntryType {
+  EMOTIONAL_DETOX
+  FOOD_REACTION
+  TRIGGER_LOG
+  THOUGHT_REPLACEMENT
+  GENERAL
+}
+
+model Assessment {
+  id           String         @id @default(cuid())
+  userId       String
+  assessmentType AssessmentType
+  
+  // Scores by area (1-10)
+  nutritionScore    Int?
+  stressScore       Int?
+  sleepScore        Int?
+  exerciseScore     Int?
+  brainScore        Int?
+  fitnessScore      Int?
+  mindsetScore      Int?
+  
+  overallScore      Float?
+  
+  answers           Json?      // Raw assessment answers
+  
+  createdAt         DateTime   @default(now())
+  
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("assessments")
+}
+
+enum AssessmentType {
+  BASELINE
+  WEEKLY
+  FINAL
+}
+
+// ================== PROGRAM & NUTRITION ==================
+
+model WeekProgram {
+  weekNumber   Int      @id
+  title        String
+  description  String   @db.Text
+  focusAreas   String[] // Array of focus area keys
+  
+  foodsToRemove Json?   // Array of food items
+  foodsToAdd    Json?   // Array of food items
+  
+  supplements   Json?   // Array of supplement recommendations
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("week_programs")
+}
+
+model NutritionLog {
+  id           String   @id @default(cuid())
+  userId       String
+  date         DateTime @db.Date
+  mealType     MealType
+  foods        Json     // Array of food items eaten
+  notes        String?
+  
+  // Reaction tracking
+  reactionTime Int?     // Minutes after eating
+  symptoms     String[]
+  severity     Int?     // 1-10
+  
+  createdAt    DateTime @default(now())
+
+  @@map("nutrition_logs")
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+// ================== NOTIFICATIONS ==================
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  token     String
+  platform  String   // ios, android
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("push_tokens")
+}
+
+model ScheduledNotification {
+  id           String   @id @default(cuid())
+  userId       String
+  type         NotificationType
+  scheduledFor DateTime
+  sent         Boolean  @default(false)
+  title        String
+  body         String
+  data         Json?
+  
+  createdAt    DateTime @default(now())
+
+  @@map("scheduled_notifications")
+}
+
+enum NotificationType {
+  MORNING_CHECKIN
+  SUPPLEMENT_REMINDER
+  MINDFULNESS_REMINDER
+  WEEKLY_REVIEW
+  STREAK_REMINDER
+  AI_INSIGHT
+}
